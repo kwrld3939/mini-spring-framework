@@ -516,9 +516,5 @@ src/test/java/com/demo/mini/MiniApplicationContextTests.java
 5. 优化 AOP，使 Controller 注入的依赖也能拿到代理对象
 6. 增加异常场景测试，例如重复 beanName、缺少依赖、多实现无 Qualifier
 7. 扩展 RequestMapping，支持请求参数绑定
-8. 编写项目流程图和面试讲解稿
+8. 补充项目流程图和设计说明
 ```
-
-## 简历描述参考
-
-手写 Mini Spring IoC 容器：基于 Java 反射、注解和 ClassLoader 实现轻量级 IoC 容器，支持组件扫描、BeanDefinition 注册、单例池管理、构造器/字段依赖注入、`@Qualifier` 多实现选择、`@Value` 配置注入、singleton/prototype 作用域、Bean 生命周期回调以及简易 RequestMapping 映射；实现 BeanPostProcessor 扩展机制，并基于 JDK 动态代理完成 `@MyLog` 日志 AOP 增强，使用 JUnit 5 覆盖容器核心功能测试，加深了对 Spring IoC、DI、AOP 和 MVC 映射机制的理解。
