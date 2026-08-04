@@ -18,6 +18,7 @@ public class MyDispatcherServlet extends HttpServlet {
 
 	private MyApplicationContext applicationContext;
 	private MyHandlerMapping handlerMapping;
+	private final RequestArgumentResolver argumentResolver = new RequestArgumentResolver();
 
 	public MyDispatcherServlet() {
 	}
@@ -72,21 +73,11 @@ public class MyDispatcherServlet extends HttpServlet {
 	private Object invoke(MyHandlerMapping.HandlerMethod handlerMethod, HttpServletRequest request, HttpServletResponse response)
 			throws Exception {
 		Method method = handlerMethod.method();
-		Class<?>[] parameterTypes = method.getParameterTypes();
-		if (parameterTypes.length == 0) {
+		if (method.getParameterCount() == 0) {
 			return method.invoke(handlerMethod.bean());
 		}
 
-		Object[] args = new Object[parameterTypes.length];
-		for (int i = 0; i < parameterTypes.length; i++) {
-			if (HttpServletRequest.class.isAssignableFrom(parameterTypes[i])) {
-				args[i] = request;
-			} else if (HttpServletResponse.class.isAssignableFrom(parameterTypes[i])) {
-				args[i] = response;
-			} else {
-				throw new IllegalArgumentException("Unsupported handler parameter type: " + parameterTypes[i].getName());
-			}
-		}
+		Object[] args = argumentResolver.resolve(method, request, response);
 		return method.invoke(handlerMethod.bean(), args);
 	}
 

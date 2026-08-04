@@ -3,7 +3,11 @@ package com.demo.controller;
 import com.demo.mini.annotation.MyComponent;
 import com.demo.mini.annotation.MyPostConstruct;
 import com.demo.mini.annotation.MyRequestMapping;
+import com.demo.mini.annotation.MyRequestParam;
 import com.demo.service.UserService;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
 @MyComponent
 public class UserController {
@@ -22,5 +26,12 @@ public class UserController {
 	@MyRequestMapping(path = "/user/hello")
 	public String hello() {
 		return userService.hello();
+	}
+
+	@MyRequestMapping(path = "/user/inspect")
+	public String inspect(HttpServletRequest request, HttpServletResponse response,
+			@MyRequestParam("name") String name,
+			@MyRequestParam("count") int count) {
+		return userService.hello() + " | " + name + ":" + count;
 	}
 }

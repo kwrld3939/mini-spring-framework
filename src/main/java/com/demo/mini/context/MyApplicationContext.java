@@ -30,6 +30,7 @@ import com.demo.mini.annotation.MyScope;
 import com.demo.mini.annotation.MyValue;
 import com.demo.mini.beans.BeanDefinition;
 import com.demo.mini.beans.BeanPostProcessor;
+import com.demo.mini.util.SimpleTypeConverter;
 
 public class MyApplicationContext implements AutoCloseable {
 
@@ -53,7 +54,7 @@ public class MyApplicationContext implements AutoCloseable {
 		loadProperties();
 		scanBeanClasses();
 		createBeans();
-		injectFields();
+		injectDependencies();
 		registerBeanPostProcessors();
 		initializeBeans();
 	}
@@ -67,7 +68,7 @@ public class MyApplicationContext implements AutoCloseable {
 			return getOrCreateBean(beanName, new HashSet<>());
 		}
 		Object bean = instantiate(beanDefinition.getBeanClass(), new HashSet<>());
-		injectFields(bean);
+		injectDependencies(bean);
 		return initializeBean(beanName, bean);
 	}
 
@@ -238,13 +239,13 @@ public class MyApplicationContext implements AutoCloseable {
 		return chosen;
 	}
 
-	private void injectFields() {
+	private void injectDependencies() {
 		for (Object bean : beans.values()) {
-			injectFields(bean);
+			injectDependencies(bean);
 		}
 	}
 
-	private void injectFields(Object bean) {
+	private void injectDependencies(Object bean) {
 		for (Field field : bean.getClass().getDeclaredFields()) {
 			if (field.isAnnotationPresent(MyValue.class)) {
 				injectValue(bean, field);
@@ -265,6 +266,22 @@ public class MyApplicationContext implements AutoCloseable {
 				throw new IllegalStateException("Failed to inject field: " + field, ex);
 			}
 		}
+
+		for (Method method : bean.getClass().getDeclaredMethods()) {
+			if (!method.isAnnotationPresent(MyAutowired.class)) {
+				continue;
+			}
+			if (method.getParameterCount() != 1) {
+				throw new IllegalStateException("Autowired method must have exactly one parameter: " + method);
+			}
+			Object dependency = resolveDependency(method.getParameters()[0], method.getParameterTypes()[0], new HashSet<>());
+			try {
+				method.setAccessible(true);
+				method.invoke(bean, dependency);
+			} catch (Exception ex) {
+				throw new IllegalStateException("Failed to inject method: " + method, ex);
+			}
+		}
 	}
 
 	private void injectValue(Object bean, Field field) {
@@ -275,32 +292,13 @@ public class MyApplicationContext implements AutoCloseable {
 			throw new IllegalStateException("No property found for key: " + propertyKey);
 		}
 
-		Object convertedValue = convertValue(propertyValue, field.getType());
+		Object convertedValue = SimpleTypeConverter.convert(propertyValue, field.getType());
 		try {
 			field.setAccessible(true);
 			field.set(bean, convertedValue);
 		} catch (IllegalAccessException ex) {
 			throw new IllegalStateException("Failed to inject value into field: " + field, ex);
 		}
-	}
-
-	private Object convertValue(String value, Class<?> targetType) {
-		if (targetType == String.class) {
-			return value;
-		}
-		if (targetType == int.class || targetType == Integer.class) {
-			return Integer.parseInt(value);
-		}
-		if (targetType == long.class || targetType == Long.class) {
-			return Long.parseLong(value);
-		}
-		if (targetType == boolean.class || targetType == Boolean.class) {
-			return Boolean.parseBoolean(value);
-		}
-		if (targetType == double.class || targetType == Double.class) {
-			return Double.parseDouble(value);
-		}
-		throw new IllegalArgumentException("Unsupported @MyValue field type: " + targetType.getName());
 	}
 
 	private Object resolveDependency(Field field) {

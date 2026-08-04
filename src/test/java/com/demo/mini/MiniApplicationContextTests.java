@@ -3,20 +3,32 @@ package com.demo.mini;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.util.HashMap;
+import java.util.Map;
 
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import com.demo.controller.UserController;
+import com.demo.mini.web.RequestArgumentResolver;
+import com.demo.service.AlphaService;
+import com.demo.service.BetaService;
 import org.junit.jupiter.api.Test;
 
 import com.demo.controller.PayController;
-import com.demo.controller.UserController;
 import com.demo.mini.context.MyApplicationContext;
 import com.demo.mini.web.MyHandlerMapping;
 import com.demo.service.OrderService;
 import com.demo.service.PayService;
+import com.demo.service.ReportService;
 import com.demo.service.UserService;
 
 class MiniApplicationContextTests {
@@ -89,6 +101,63 @@ class MiniApplicationContextTests {
 	}
 
 	@Test
+	void fallsBackToCglibForClassBasedAopTargets() {
+		try (MyApplicationContext context = new MyApplicationContext("com.demo")) {
+			ReportService reportService = context.getBean(ReportService.class);
+
+			assertNotNull(reportService);
+			assertFalse(Proxy.isProxyClass(reportService.getClass()));
+			assertTrue(reportService.getClass().getName().contains("$$"));
+			assertEquals("report ready", reportService.buildReport());
+		}
+	}
+
+	@Test
+	void supportsSetterBasedCircularDependencies() {
+		try (MyApplicationContext context = new MyApplicationContext("com.demo")) {
+			AlphaService alphaService = context.getBean(AlphaService.class);
+			BetaService betaService = context.getBean(BetaService.class);
+
+			assertNotNull(alphaService);
+			assertNotNull(betaService);
+			assertEquals("alpha -> beta", alphaService.chain());
+			assertEquals("beta -> alpha", betaService.chain());
+		}
+	}
+
+	@Test
+	void resolvesRequestParametersForMappedHandlers() throws Exception {
+		try (MyApplicationContext context = new MyApplicationContext("com.demo")) {
+			MyHandlerMapping handlerMapping = new MyHandlerMapping(context);
+			Method method = UserController.class.getMethod("inspect",
+					HttpServletRequest.class, HttpServletResponse.class, String.class, int.class);
+
+			Map<String, String> parameters = new HashMap<>();
+			parameters.put("name", "Alice");
+			parameters.put("count", "3");
+
+			HttpServletRequest request = (HttpServletRequest) Proxy.newProxyInstance(
+					HttpServletRequest.class.getClassLoader(),
+					new Class<?>[] { HttpServletRequest.class },
+					new RequestInvocationHandler(parameters));
+			HttpServletResponse response = (HttpServletResponse) Proxy.newProxyInstance(
+					HttpServletResponse.class.getClassLoader(),
+					new Class<?>[] { HttpServletResponse.class },
+					(proxy, invokedMethod, ignoredArgs) -> null);
+
+			RequestArgumentResolver resolver = new RequestArgumentResolver();
+			Object[] resolvedArgs = resolver.resolve(method, request, response);
+
+			assertSame(request, resolvedArgs[0]);
+			assertSame(response, resolvedArgs[1]);
+			assertEquals("Alice", resolvedArgs[2]);
+			assertEquals(3, resolvedArgs[3]);
+			assertEquals("hello mini ioc from mini-spring | Alice:3",
+					handlerMapping.getMappings().get("/user/inspect").invoke(resolvedArgs));
+		}
+	}
+
+	@Test
 	void throwsWhenMultipleBeansFoundByType() {
 		try (MyApplicationContext context = new MyApplicationContext("com.demo")) {
 			IllegalStateException ex = assertThrows(IllegalStateException.class,
@@ -107,6 +176,26 @@ class MiniApplicationContextTests {
 					() -> handlerMapping.invoke("/missing"));
 
 			assertTrue(ex.getMessage().contains("No handler"));
+		}
+	}
+
+	private static final class RequestInvocationHandler implements InvocationHandler {
+
+		private final Map<String, String> parameters;
+
+		private RequestInvocationHandler(Map<String, String> parameters) {
+			this.parameters = parameters;
+		}
+
+		@Override
+		public Object invoke(Object proxy, Method method, Object[] args) {
+			if ("getParameter".equals(method.getName())) {
+				return parameters.get(String.valueOf(args[0]));
+			}
+			if ("getMethod".equals(method.getName())) {
+				return "GET";
+			}
+			return null;
 		}
 	}
 }

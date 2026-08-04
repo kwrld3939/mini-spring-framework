@@ -1,5 +1,22 @@
 # Mini Spring IoC Container
 
+更新日期：2026-08-04
+
+## 更新记录（2026-08-04）
+
+- 新增 setter 注入示例，补上循环依赖的学习场景
+- 简易 AOP 升级为 JDK 动态代理 + CGLIB 回退
+- RequestMapping 增加请求参数绑定和基础类型转换
+- 新增对应单元测试，验证新能力是否可回归
+
+## 后续拓展（2026-08-04 起）
+
+- `@PathVariable` 和路径模板解析
+- `@RequestBody` 与 JSON 入参绑定
+- 统一异常处理与返回体封装
+- 事件机制和监听器
+- `BeanFactory` / `ApplicationContext` 分层
+
 这是一个用于学习 Spring 核心原理的 Mini Spring 项目。项目不依赖 Spring 容器本身，而是基于 Java 原生反射、注解和 ClassLoader 实现一个轻量级 IoC 容器，覆盖组件扫描、BeanDefinition 注册、依赖注入、Bean 生命周期、作用域、配置注入、BeanPostProcessor 扩展点、简易 AOP 以及 RequestMapping 映射等核心流程。
 
 项目目标不是替代 Spring，而是通过手写简化版本，理解 Spring IoC、DI、AOP 和 MVC 映射机制背后的设计思想。
@@ -13,6 +30,7 @@
 - Java Annotation
 - Java ClassLoader
 - JDK Dynamic Proxy
+- Spring CGLIB
 - javax.servlet-api
 
 ## 核心功能
@@ -20,18 +38,20 @@
 | 功能 | 说明 |
 | --- | --- |
 | 组件扫描 | 使用 Java 原生 ClassLoader 递归扫描指定根包下的 class 文件 |
-| 自定义注解 | 实现 `@MyComponent`、`@MyAutowired`、`@MyQualifier`、`@MyValue` 等注解 |
+| 自定义注解 | 实现 `@MyComponent`、`@MyAutowired`、`@MyQualifier`、`@MyValue`、`@MyRequestParam` 等注解 |
 | BeanDefinition | 保存 Bean 的元信息，包括 beanName、beanClass、scope、lazyInit |
 | IoC 容器 | 由 `MyApplicationContext` 统一创建、管理和获取 Bean |
 | 构造器注入 | 根据构造器参数类型和 `@MyQualifier` 从容器中解析依赖 |
 | 字段注入 | 通过反射给 `@MyAutowired` 字段注入依赖 |
+| setter 注入 | 支持在方法上使用 `@MyAutowired`，用于演示 setter 循环依赖 |
 | 配置注入 | 通过 `@MyValue` 从 `application.properties` 注入配置值 |
 | 作用域 | 支持 singleton 和 prototype |
 | 生命周期 | 支持 `@MyPostConstruct` 初始化回调和 `@MyPreDestroy` 销毁回调 |
 | BeanPostProcessor | 支持 Bean 初始化前后扩展点 |
-| 简易 AOP | 基于 BeanPostProcessor 和 JDK 动态代理实现 `@MyLog` 日志增强 |
-| RequestMapping | 扫描 `@MyRequestMapping`，建立 URL 到方法的映射关系 |
+| 简易 AOP | 基于 BeanPostProcessor 实现 `@MyLog` 日志增强，支持 JDK 动态代理和 CGLIB 回退 |
+| RequestMapping | 扫描 `@MyRequestMapping`，建立 URL 到方法的映射关系，并支持基础请求参数绑定 |
 | 单元测试 | 使用 JUnit 5 验证容器核心功能 |
+| 报错指南 | `SpringBoot报错指南.md` 记录常见开发、调试错误和解决方案 |
 
 ## 项目结构
 
@@ -42,9 +62,12 @@ src/main/java/com/demo
 │   ├── PayController.java
 │   └── UserController.java
 ├── service
+│   ├── AlphaService.java
 │   ├── AliPayService.java
+│   ├── BetaService.java
 │   ├── OrderService.java
 │   ├── PayService.java
+│   ├── ReportService.java
 │   ├── UserService.java
 │   └── WechatPayService.java
 ├── processor
@@ -59,6 +82,7 @@ src/main/java/com/demo
     │   ├── MyPreDestroy.java
     │   ├── MyQualifier.java
     │   ├── MyRequestMapping.java
+    │   ├── MyRequestParam.java
     │   ├── MyScope.java
     │   └── MyValue.java
     ├── beans
@@ -66,9 +90,12 @@ src/main/java/com/demo
     │   └── BeanPostProcessor.java
     ├── context
     │   └── MyApplicationContext.java
+    ├── util
+    │   └── SimpleTypeConverter.java
     └── web
         ├── MyDispatcherServlet.java
-        └── MyHandlerMapping.java
+        ├── MyHandlerMapping.java
+        └── RequestArgumentResolver.java
 ```
 
 ## 启动流程
@@ -89,8 +116,8 @@ MainApp.main()
 -> 注册 BeanDefinition
 -> createBeans()
 -> 构造器注入
--> injectFields()
--> 字段注入 / @MyValue 配置注入
+-> injectDependencies()
+-> 字段注入 / setter 注入 / @MyValue 配置注入
 -> registerBeanPostProcessors()
 -> initializeBeans()
 -> BeanPostProcessor before
@@ -103,16 +130,16 @@ MainApp.main()
 -> @MyPreDestroy
 ```
 
-一句话概括：
+概括：
 
 ```text
 扫描包 -> 解析注解 -> 注册 BeanDefinition -> 创建 Bean -> 依赖注入 -> 初始化扩展 -> 生命周期回调 -> AOP 代理 -> 单例池管理 -> getBean 使用
 ```
 
-一句话版启动流程图：
+启动流程图：
 
 ```text
-MainApp 启动 -> 创建 MyApplicationContext -> ClassLoader 扫描根包 -> 解析 @MyComponent -> 注册 BeanDefinition -> 实例化 Bean -> 构造器/字段/@Value 注入 -> 执行 BeanPostProcessor -> 生命周期初始化 -> 初始化后生成 AOP 代理 -> 替换/更新单例池中的原始 Bean -> getBean 获取使用 -> close 触发销毁
+MainApp 启动 -> 创建 MyApplicationContext -> ClassLoader 扫描根包 -> 解析 @MyComponent -> 注册 BeanDefinition -> 实例化 Bean -> 构造器/字段/setter/@Value 注入 -> 执行 BeanPostProcessor -> 生命周期初始化 -> 初始化后生成 AOP 代理 -> 替换/更新单例池中的原始 Bean -> getBean 获取使用 -> close 触发销毁
 ```
 
 ## IoC 实现原理
@@ -171,7 +198,7 @@ private final boolean lazyInit;
 
 DI 是 IoC 的具体实现方式，也就是容器创建对象后，帮对象装配依赖。
 
-本项目支持两种注入方式。
+本项目支持三种注入方式。
 
 ### 构造器注入
 
@@ -195,6 +222,19 @@ private UserService userService;
 ```
 
 容器会遍历 Bean 的字段，如果字段上存在 `@MyAutowired`，则从容器中按字段名或类型查找依赖，并通过 `field.set()` 完成注入。
+
+### setter 注入
+
+示例：
+
+```java
+@MyAutowired
+public void setBetaService(BetaService betaService) {
+    this.betaService = betaService;
+}
+```
+
+容器会遍历 Bean 的方法，如果方法上存在 `@MyAutowired`，且方法只有一个参数，就从容器中解析该参数对应的依赖，并通过反射调用该方法完成注入。当前项目使用 `AlphaService` 和 `BetaService` 演示 setter 方式下的循环依赖。
 
 ## 配置注入
 
@@ -309,7 +349,7 @@ public interface BeanPostProcessor {
 
 ## 简易 AOP 实现
 
-项目通过 `@MyLog`、`BeanPostProcessor` 和 JDK 动态代理实现了一个简易 AOP。
+项目通过 `@MyLog`、`BeanPostProcessor`、JDK 动态代理和 CGLIB 实现了一个简易 AOP。
 
 示例：
 
@@ -324,17 +364,25 @@ public String pay() {
 `LogAopBeanPostProcessor` 会在 Bean 初始化后判断：
 
 ```text
-1. 当前 Bean 是否实现了接口
-2. 当前 Bean 是否存在带 @MyLog 的方法
+1. 当前 Bean 是否存在带 @MyLog 的方法
+2. 如果 Bean 实现了接口，使用 JDK 动态代理
+3. 如果 Bean 没有实现接口，尝试使用 CGLIB 创建子类代理
 ```
 
-如果满足条件，就通过：
+如果目标 Bean 实现了接口，就通过：
 
 ```java
 Proxy.newProxyInstance(...)
 ```
 
 创建代理对象，并替换单例池中的原始 Bean。
+
+如果目标 Bean 没有实现接口，例如 `ReportService`，则通过 CGLIB 创建代理：
+
+```java
+Enhancer enhancer = new Enhancer();
+enhancer.setSuperclass(beanClass);
+```
 
 运行效果：
 
@@ -348,10 +396,10 @@ Invoke payService.pay(): ali pay
 当前 AOP 的限制：
 
 ```text
-1. 只支持 JDK 动态代理，因此目标类必须实现接口
-2. 不支持 CGLIB 方式代理普通类
-3. 构造器注入时，依赖对象可能仍然是原始对象，不一定是代理对象
-4. 只实现了日志增强，没有实现完整切点表达式
+1. CGLIB 不能代理 final 类，也不能增强 final 方法
+2. 构造器注入时，依赖对象可能仍然是原始对象，不一定是代理对象
+3. 只实现了日志增强，没有实现完整切点表达式
+4. 没有实现通知顺序、切点表达式、异常通知等完整 AOP 能力
 ```
 
 更具体地说，当前版本的 AOP 是学习版实现，代理对象是在 `postProcessAfterInitialization` 阶段生成并放回单例池的。因此，如果某个 Bean 在代理生成之前已经通过构造器注入拿到了原始对象，那么它内部持有的仍然可能是未代理对象。
@@ -397,10 +445,22 @@ public String hello() {
 }
 ```
 
+带请求参数的示例：
+
+```java
+@MyRequestMapping(path = "/user/inspect")
+public String inspect(HttpServletRequest request, HttpServletResponse response,
+        @MyRequestParam("name") String name,
+        @MyRequestParam("count") int count) {
+    return userService.hello() + " | " + name + ":" + count;
+}
+```
+
 `MyHandlerMapping` 会遍历容器中的 Bean，扫描方法上的 `@MyRequestMapping`，并建立映射表：
 
 ```text
 /user/hello -> UserController#hello
+/user/inspect -> UserController#inspect
 /pay -> PayController#pay
 ```
 
@@ -414,7 +474,8 @@ handlerMapping.invoke("/user/hello");
 
 ```text
 根据 path 查找 Method
--> 通过 method.invoke(bean) 反射调用
+-> 使用 RequestArgumentResolver 解析 request / response / @MyRequestParam
+-> 通过 method.invoke(bean, args) 反射调用
 -> 返回方法结果
 ```
 
@@ -432,12 +493,14 @@ handlerMapping.invoke("/user/hello");
 | `@MyPostConstruct` | `@PostConstruct` |
 | `@MyPreDestroy` | `@PreDestroy` |
 | `@MyRequestMapping` | `@RequestMapping` |
+| `@MyRequestParam` | `@RequestParam` |
 | `@MyLog` | 自定义切面注解 |
 | `BeanDefinition` | Spring BeanDefinition |
 | `BeanPostProcessor` | Spring BeanPostProcessor |
 | `MyApplicationContext` | Spring ApplicationContext |
 | `MyHandlerMapping` | Spring HandlerMapping |
 | `MyDispatcherServlet` | Spring DispatcherServlet |
+| `RequestArgumentResolver` | Spring MVC HandlerMethodArgumentResolver |
 
 ## 运行方式
 
@@ -467,6 +530,18 @@ Windows PowerShell：
 .\mvnw.cmd test
 ```
 
+如果本机 Maven 仓库放在 D 盘，可以指定本地仓库运行：
+
+```powershell
+.\mvnw.cmd "-Dmaven.repo.local=D:/maven-repository" test
+```
+
+常见开发和调试错误可以参考：
+
+```text
+SpringBoot报错指南.md
+```
+
 ## 测试覆盖
 
 测试文件：
@@ -486,6 +561,9 @@ src/test/java/com/demo/mini/MiniApplicationContextTests.java
 6. BeanPostProcessor 生成 AOP 代理
 7. 多实现按类型获取时抛出明确异常
 8. RequestMapping 路径不存在时抛出明确异常
+9. setter 注入下的循环依赖
+10. 无接口类的 CGLIB AOP 代理
+11. @MyRequestParam 请求参数解析和类型转换
 ```
 
 ## 当前不足
@@ -495,13 +573,9 @@ src/test/java/com/demo/mini/MiniApplicationContextTests.java
 ```text
 1. 包扫描只支持 file 协议，不支持 jar 包扫描
 2. Bean 创建流程没有实现完整三级缓存
-3. 对循环依赖的处理不完整
-4. AOP 只支持 JDK 动态代理，不支持 CGLIB
-5. RequestMapping 不支持请求参数绑定
-6. DispatcherServlet 仅为简化实现，没有完整 MVC 能力
-7. 没有实现 BeanFactory 和 ApplicationContext 的分层设计
-8. 没有实现复杂的 BeanPostProcessor 顺序控制
-9. 没有实现条件装配、自动配置等 Spring Boot 能力
+3. 没有实现 BeanFactory 和 ApplicationContext 的分层设计
+4. 没有实现复杂的 BeanPostProcessor 顺序控制
+5. 没有实现条件装配、自动配置等 Spring Boot 能力
 ```
 
 ## 后续优化方向
@@ -509,12 +583,12 @@ src/test/java/com/demo/mini/MiniApplicationContextTests.java
 后续可以继续扩展：
 
 ```text
-1. 实现 BeanFactory 和 ApplicationContext 分层
-2. 实现 @MyPrimary，优化多实现注入选择
-3. 实现 BeanPostProcessor 执行顺序控制
-4. 支持 CGLIB 代理没有接口的类
-5. 优化 AOP，使 Controller 注入的依赖也能拿到代理对象
-6. 增加异常场景测试，例如重复 beanName、缺少依赖、多实现无 Qualifier
-7. 扩展 RequestMapping，支持请求参数绑定
+1. 实现 @MyPrimary，优化多实现注入选择
+2. 实现 BeanPostProcessor 执行顺序控制
+3. 完善循环依赖的更多失败场景测试
+4. 优化 AOP 的代理暴露和注入一致性
+5. 扩展 RequestMapping，继续支持 @PathVariable 和 @RequestBody
+6. 增加统一异常处理和返回体封装
+7. 补充事件机制和监听器
 8. 补充项目流程图和设计说明
 ```
