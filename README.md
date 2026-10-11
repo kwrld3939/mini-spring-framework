@@ -8,7 +8,9 @@
 >
 > 本项目正从"学习版演示"升级为**可被外部项目依赖的库**：已拆为 `mini-spring-beans` / `mini-spring-context` / `mini-spring-web` 三个库模块加两个样例模块，包名统一为 `io.github.kwrld3939.minispring.*`，并完成 `javax.servlet` → `jakarta.servlet` 迁移。
 >
-> 架构决策见 [docs/adr/](docs/adr/README.md)（九篇 ADR）。**已落地**：ADR-0001 依赖解析与代理暴露、ADR-0002 循环依赖范围、ADR-0004 模块划分与坐标、ADR-0005 异常层级、ADR-0006 的冻结模型与销毁逆序、ADR-0007 的 jakarta 迁移、ADR-0009 类型命名。**尚未落地**：ADR-0003 的 ASM 扫描、ADR-0007 的 Web 能力（路由/绑定/错误语义）、SLF4J 与工程化门禁——推进计划与退出条件见 [docs/roadmap.md](docs/roadmap.md)。
+> 架构决策见 [docs/adr/](docs/adr/README.md)（**11 篇**；编号 0008 为"代理实现选择"预留，尚未撰写）。**已落地**：ADR-0001 依赖解析与代理暴露、ADR-0002 循环依赖范围、ADR-0003 类路径扫描（ASM，不加载用户的类）、ADR-0004 模块划分与坐标、ADR-0005 异常层级、ADR-0006 并发与生命周期冻结、ADR-0009 类型命名、ADR-0010 静态分析与架构守卫、ADR-0011 覆盖率门槛落点、ADR-0012 构造器选择，以及 ADR-0007 的 jakarta 迁移部分。**尚未落地**：ADR-0007 的 Web 能力（路由 method/模板、`@MiniPathVariable`/`@MiniRequestBody`、404/405/400、`@MiniExceptionHandler`）、ADR-0008 代理实现、`FailureAnalyzer` 结构化启动失败报告——推进计划与退出条件见 [docs/roadmap.md](docs/roadmap.md)。
+>
+> 四类质量门禁已全部接入并在 CI 上运行：enforcer（禁依赖）、Checkstyle（禁 `System.out`、禁 `javax.servlet` 导入）、ArchUnit（依赖方向）、JaCoCo（库模块行 85% / 分支 75%）；CI 矩阵为 JDK 21/25 × Linux/Windows。
 >
 > 本文以下内容中与 ADR 冲突的部分以 ADR 为准；"简易 AOP 实现"一节已按新语义重写，其余章节会随阶段 1 的推进继续重写。
 
@@ -606,13 +608,13 @@ SpringBoot报错指南.md
 ## 当前不足
 
 ```text
-1. 包扫描只支持目录（file: 协议），不支持 jar；"不加载类即可读注解"的 ASM 方案待做（ADR-0003）
+1. 扫描支持目录与 jar，但 jar 需要目录条目（jar 工具/Maven 生成的 jar 默认都有）；其他协议（http 等）不支持；嵌套 jar 明确报错而不是漏扫
 2. 只有单例池 + 早期引用，不是完整的三级缓存；明确不支持 lazyInit（ADR-0006）
 3. 构造器注入参与的环、涉及 prototype 的环不支持（有意为之，见 ADR-0002）
 4. 未实现 BeanPostProcessor / 切面的执行顺序控制（@MiniOrder）
 5. 未实现条件装配与自动配置
-6. 日志仍用 System.out，SLF4J 接入待做；启动诊断尚未输出为日志
-7. 框架模块自身缺少覆盖率门槛与依赖收敛门禁（JaCoCo / enforcer）
+6. Web 层语义仍是雏形：不区分 HTTP method、无路径模板、无 @MiniRequestBody、必填参数缺失与类型转换失败目前返回 500（按 ADR-0007 应为 400）、无统一异常处理
+7. 静态分析只启用了两条 Checkstyle 规则 + enforcer + ArchUnit；Spotless / ErrorProne / SpotBugs 按 ADR-0010 有意暂缓
 ```
 
 ## 后续优化方向
@@ -620,11 +622,11 @@ SpringBoot报错指南.md
 完整的阶段划分与退出条件见 [`docs/roadmap.md`](docs/roadmap.md)，近期优先级：
 
 ```text
-1. ASM 扫描：扫描阶段不加载类、支持 jar、消除静态初始化副作用（ADR-0003）
-2. 接入 SLF4J，把启动诊断（含环上代理的例外）输出为 WARN
-3. 异常层级补完：结构化启动失败报告（FailureAnalyzer）
-4. 框架模块的覆盖率门槛、enforcer 禁依赖断言、ArchUnit 依赖方向守卫
-5. 扩展 RequestMapping：@MiniPathVariable、@MiniRequestBody、404/405/400 语义（ADR-0007）
-6. 实现 @MiniPrimary 与集合注入（List<T> / Map<String,T>）
-7. 事件机制与监听器
+1. 异常层级收尾：结构化启动失败报告（FailureAnalyzer），把"启动失败"从读栈变成读报告
+2. Web 能力（ADR-0007）：路由 method/模板、@MiniPathVariable、@MiniRequestBody、404/405/400 语义、@MiniExceptionHandler、两个 sample 的真实 HTTP 集成测试
+3. 代理实现选择（ADR-0008）：去掉样例对 spring-core 中 CGLIB 的借用
+4. 实现 @MiniPrimary 与集合注入（List<T> / Map<String,T>）、@MiniOrder 执行顺序
+5. 条件装配与自动配置的最小版本
+6. 事件机制与监听器
+7. 工程化收尾（阶段 3）：japicmp 二进制兼容门禁、BOM、sources/javadoc、GPG 与发布、JMH 基准
 ```
