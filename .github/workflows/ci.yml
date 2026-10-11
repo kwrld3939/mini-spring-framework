@@ -1,0 +1,57 @@
+name: CI
+
+# 与本地同一条命令：mvn verify（单元测试 + enforcer + Checkstyle + ArchUnit + JaCoCo 门槛）。
+# 库的 Java 基线是 21，25 作为前瞻目标一起跑，用来提前发现未来 JDK 的兼容问题。
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+# 同一分支上新的推送取消尚未完成的运行，避免排队浪费额度。
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: verify (${{ matrix.os }}, JDK ${{ matrix.java }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      # 一个组合失败不影响其他组合出结果——否则 JDK 25 的问题会掩盖 Windows 上的问题。
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, windows-latest ]
+        java: [ 21, 25 ]
+        include:
+          # Windows runner 默认 shell 是 pwsh，包装脚本要走 .cmd。
+          - os: ubuntu-latest
+            mvn: ./mvnw
+          - os: windows-latest
+            mvn: .\mvnw.cmd
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ matrix.java }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+          # 缓存 ~/.m2/repository：CI 上没有本地的阿里云镜像与 D:/maven-repository，
+          # 依赖全部来自 Maven Central，首次运行需要下载。
+          cache: maven
+
+      - name: mvn verify
+        run: ${{ matrix.mvn }} -B verify
+
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.os }}-jdk${{ matrix.java }}
+          path: '**/target/site/jacoco/'
+          if-no-files-found: ignore
+          retention-days: 7

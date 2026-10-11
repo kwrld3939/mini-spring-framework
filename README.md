@@ -1,5 +1,7 @@
 # Mini Spring IoC Container
 
+[![CI](https://github.com/kwrld3939/mini-spring-ioc-container/actions/workflows/ci.yml/badge.svg)](https://github.com/kwrld3939/mini-spring-ioc-container/actions/workflows/ci.yml)
+
 更新日期：2026-10-11
 
 > **重构状态（2026-10-11 起）**
@@ -589,7 +591,7 @@ SpringBoot报错指南.md
 
 ## 质量门禁
 
-一条 `mvn verify` 会跑完下面全部检查，任何一条不过就构建失败。规则的选择理由与"有意不做哪些"记在 [`docs/adr/0010`](docs/adr/0010-static-analysis-and-architecture-guards.md)。
+一条 `mvn verify` 会跑完下面全部检查，任何一条不过就构建失败。CI（GitHub Actions，JDK 21/25 × Linux/Windows 四个组合）跑的是**同一条命令**，所以本地绿就等于 CI 绿。规则的选择理由与"有意不做哪些"记在 [`docs/adr/0010`](docs/adr/0010-static-analysis-and-architecture-guards.md)。
 
 | 门禁 | 拦什么 | 怎么证明它真的会拦 |
 | --- | --- | --- |
