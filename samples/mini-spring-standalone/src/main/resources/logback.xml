@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  样例的日志配置：库本身不提供 logback.xml，使用者可自行决定格式与级别。
+  这里刻意保持简洁，让样例输出可读：时间 + 级别 + 简名 + 消息。
+-->
+<configuration>
+	<appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+		<encoder>
+			<pattern>%d{HH:mm:ss.SSS} %-5level %logger{0} - %msg%n</pattern>
+		</encoder>
+	</appender>
+
+	<logger name="io.github.kwrld3939.minispring" level="INFO" />
+
+	<root level="INFO">
+		<appender-ref ref="CONSOLE" />
+	</root>
+</configuration>

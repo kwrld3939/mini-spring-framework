@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<parent>
+		<groupId>io.github.kwrld3939</groupId>
+		<artifactId>mini-spring-parent</artifactId>
+		<version>0.1.0-SNAPSHOT</version>
+		<relativePath>../pom.xml</relativePath>
+	</parent>
+
+	<artifactId>mini-spring-web</artifactId>
+	<name>mini-spring-web</name>
+	<description>HandlerMapping、请求参数解析与 DispatcherServlet 适配层（jakarta.servlet 6.1）</description>
+
+	<!--
+	  ADR-0007：本模块只依赖 jakarta.servlet，且为 provided + optional，
+	  避免把 servlet API 传染给只用 IoC/AOP 的使用者。
+	  javax.servlet 已全仓库移除：Boot 4 的 Tomcat 11 只认 jakarta，两者无法共存。
+	-->
+	<dependencies>
+		<dependency>
+			<groupId>io.github.kwrld3939</groupId>
+			<artifactId>mini-spring-context</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>jakarta.servlet</groupId>
+			<artifactId>jakarta.servlet-api</artifactId>
+			<scope>provided</scope>
+			<optional>true</optional>
+		</dependency>
+
+		<dependency>
+			<groupId>org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.junit.platform</groupId>
+			<artifactId>junit-platform-launcher</artifactId>
+			<scope>test</scope>
+		</dependency>
+
+		<!--
+		  架构守卫放在本模块：它的测试类路径同时包含 beans、context、web 三个库模块的全部类，
+		  因此可以在一个测试里断言三者的依赖方向（ADR-0004）。
+		-->
+		<dependency>
+			<groupId>com.tngtech.archunit</groupId>
+			<artifactId>archunit-junit5</artifactId>
+			<version>${archunit.version}</version>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+</project>

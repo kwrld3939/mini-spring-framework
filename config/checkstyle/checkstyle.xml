@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE module PUBLIC "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+	"https://checkstyle.org/dtds/configuration_1_3.dtd">
+<!--
+  库代码的静态检查规则（只作用于 src/main，见父 POM 的 includeTestSourceDirectory=false）。
+
+  这里**刻意只放两条**规则：它们对应的不是风格偏好，而是会真实造成问题的行为——
+  直接写标准输出会让库无法接入使用者的日志体系；javax.servlet 与 Boot 4 / Tomcat 11 的
+  jakarta.servlet 无法共存（ADR-0007）。完整规则集（命名、Javadoc、复杂度等）留待 ADR-0010 决策。
+
+  样例的命令行报告（samples/mini-spring-standalone 的 MainApp）需要写标准输出，
+  因此该模块在 pom 里跳过了本检查。
+-->
+<module name="Checker">
+	<property name="severity" value="error" />
+	<property name="charset" value="UTF-8" />
+
+	<!-- 这两条都是基于语法树的检查，必须挂在 TreeWalker 下。 -->
+	<module name="TreeWalker">
+		<module name="RegexpSinglelineJava">
+			<property name="format" value="System\.(out|err)\.print" />
+			<property name="ignoreComments" value="true" />
+			<property name="message"
+				value="库代码不得直接写 System.out/System.err：请使用 SLF4J（库只依赖 API，由使用方决定输出）" />
+		</module>
+
+		<!-- IllegalImport 不支持自定义 message，违反时的默认信息是 "Import from illegal package"，
+		     理由写在上面与 ADR-0007 里。 -->
+		<module name="IllegalImport">
+			<property name="illegalPkgs" value="javax.servlet" />
+		</module>
+	</module>
+</module>

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  测试期日志配置：把级别压到 WARN，避免每次创建上下文都打印启动 INFO 把测试输出淹没。
+  WARN 及以上仍会输出，并被断言日志行为的测试捕获。
+-->
+<configuration>
+	<appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+		<encoder>
+			<pattern>%-5level %logger{0} - %msg%n</pattern>
+		</encoder>
+	</appender>
+
+	<root level="WARN">
+		<appender-ref ref="CONSOLE" />
+	</root>
+</configuration>

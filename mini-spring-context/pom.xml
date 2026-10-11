@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<parent>
+		<groupId>io.github.kwrld3939</groupId>
+		<artifactId>mini-spring-parent</artifactId>
+		<version>0.1.0-SNAPSHOT</version>
+		<relativePath>../pom.xml</relativePath>
+	</parent>
+
+	<artifactId>mini-spring-context</artifactId>
+	<name>mini-spring-context</name>
+	<description>组件扫描、Environment/PropertySource、依赖注入、生命周期与 BeanPostProcessor 链</description>
+
+	<!--
+	  ADR-0004 约束：本模块不得依赖 spring-*、servlet、jackson、cglib。
+	  ASM（类路径扫描，见 ADR-0003）将在阶段 1 落地扫描器时加入。
+	-->
+	<dependencies>
+		<dependency>
+			<groupId>io.github.kwrld3939</groupId>
+			<artifactId>mini-spring-beans</artifactId>
+		</dependency>
+
+		<!-- 类路径扫描：读 .class 字节码元数据，不加载类（ADR-0003）。 -->
+		<dependency>
+			<groupId>org.ow2.asm</groupId>
+			<artifactId>asm</artifactId>
+		</dependency>
+
+		<!-- 日志门面：库里只出现 SLF4J API，不绑定具体实现。 -->
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-api</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.junit.platform</groupId>
+			<artifactId>junit-platform-launcher</artifactId>
+			<scope>test</scope>
+		</dependency>
+
+		<!-- 测试期提供日志后端，以便断言启动诊断确实以 WARN 输出。 -->
+		<dependency>
+			<groupId>ch.qos.logback</groupId>
+			<artifactId>logback-classic</artifactId>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+
+	<!--
+	  ADR-0004 的验收标准由构建强制：
+	  容器内核不得依赖 servlet / Spring / Jackson，也不得依赖具体代理库。
+	-->
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-enforcer-plugin</artifactId>
+				<executions>
+					<execution>
+						<id>ban-application-dependencies</id>
+						<goals>
+							<goal>enforce</goal>
+						</goals>
+						<configuration>
+							<rules>
+								<bannedDependencies>
+									<excludes>
+										<exclude>org.springframework:*</exclude>
+										<exclude>javax.servlet:*</exclude>
+										<exclude>jakarta.servlet:*</exclude>
+										<exclude>com.fasterxml.jackson.core:*</exclude>
+										<exclude>cglib:*</exclude>
+										<exclude>net.sf.cglib:*</exclude>
+									</excludes>
+									<message>mini-spring-context 不得依赖 servlet / Spring / Jackson / 具体代理库（ADR-0004）</message>
+								</bannedDependencies>
+							</rules>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+
+		</plugins>
+	</build>
+</project>

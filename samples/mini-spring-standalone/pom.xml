@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<parent>
+		<groupId>io.github.kwrld3939</groupId>
+		<artifactId>mini-spring-parent</artifactId>
+		<version>0.1.0-SNAPSHOT</version>
+		<relativePath>../../pom.xml</relativePath>
+	</parent>
+
+	<artifactId>mini-spring-standalone</artifactId>
+	<name>mini-spring-standalone</name>
+	<description>只用 mini-spring 框架运行的示例应用：演示组件扫描、三种注入、生命周期、AOP 与 RequestMapping</description>
+
+	<properties>
+		<!--
+		  技术债（阶段 2 清除）：LogAopBeanPostProcessor 借用 spring-core 中重打包的 CGLIB
+		  （org.springframework.cglib.proxy.*）创建类代理，因此这个「不依赖 Spring」的样例
+		  目前仍在编译期需要 spring-core。代理实现的选择将由 ADR-0008 决定
+		  （独立 CGLIB / ByteBuddy / 仅 JDK 动态代理），届时移除本依赖。
+		-->
+		<spring-core.version>7.0.8</spring-core.version>
+		<logback.version>1.5.34</logback.version>
+	</properties>
+
+	<dependencies>
+		<dependency>
+			<groupId>io.github.kwrld3939</groupId>
+			<artifactId>mini-spring-context</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>io.github.kwrld3939</groupId>
+			<artifactId>mini-spring-web</artifactId>
+		</dependency>
+
+		<!-- web 模块以 provided 声明 servlet，不传递给使用者，因此样例需自行声明以便编译。 -->
+		<dependency>
+			<groupId>jakarta.servlet</groupId>
+			<artifactId>jakarta.servlet-api</artifactId>
+			<scope>provided</scope>
+		</dependency>
+
+		<!-- 见上方技术债说明：仅供样例中的 CGLIB 回退演示使用。 -->
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-core</artifactId>
+			<version>${spring-core.version}</version>
+		</dependency>
+
+		<!-- 日志后端：库只依赖 SLF4J API，由使用方（这里就是样例）提供具体实现。 -->
+		<dependency>
+			<groupId>ch.qos.logback</groupId>
+			<artifactId>logback-classic</artifactId>
+			<version>${logback.version}</version>
+			<scope>runtime</scope>
+		</dependency>
+
+		<dependency>
+			<groupId>org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.junit.platform</groupId>
+			<artifactId>junit-platform-launcher</artifactId>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+
+	<build>
+		<plugins>
+			<!--
+			  样例的 MainApp 是一个命令行报告程序，需要写标准输出；"库代码禁止 System.out" 这条静态检查
+			  规则针对的是库代码，因此本模块跳过检查（库模块由父 POM 统一执行）。
+			-->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-checkstyle-plugin</artifactId>
+				<configuration>
+					<skip>true</skip>
+				</configuration>
+			</plugin>
+
+			<!--
+			  样例是**应用**而不是库：MainApp 是命令行报告程序，刻意不纳入单元测试
+			  （它的职责就是打印，断言它等于测试 System.out）。因此这里不设覆盖率门槛（ADR-0011）。
+			-->
+			<plugin>
+				<groupId>org.jacoco</groupId>
+				<artifactId>jacoco-maven-plugin</artifactId>
+				<configuration>
+					<skip>true</skip>
+				</configuration>
+			</plugin>
+		</plugins>
+	</build>
+</project>
