@@ -78,18 +78,18 @@ No qualifying bean of type
 Controller 没有生效
 ```
 
-Spring Boot 默认会从启动类所在包往下扫描。这个项目的标准 Boot 启动类是：
+Spring Boot 默认会从启动类所在包往下扫描。本仓库的 Boot 对照样例启动类是：
 
 ```java
-com.example.demo.SpringbootDemoApplication
+io.github.kwrld3939.minispring.samples.boot.SpringbootDemoApplication
 ```
 
-如果新建 Controller 放到了 `com.example.demo` 之外，Spring Boot 可能扫描不到。
+如果新建 Controller 放到了 `io.github.kwrld3939.minispring.samples.boot` 之外，Spring Boot 可能扫描不到。
 
 解决办法：
 
-- 普通 Spring Boot Controller 建议放在 `com.example.demo` 或它的子包下面。
-- Mini Spring 的学习代码则放在 `com.demo` 下，两套不要混着判断。
+- 普通 Spring Boot Controller 建议放在 `io.github.kwrld3939.minispring.samples.boot` 或它的子包下面（模块 `samples/spring-boot-reference`）。
+- Mini Spring 容器自己的代码在 `io.github.kwrld3939.minispring` 下（`mini-spring-beans` / `mini-spring-context` / `mini-spring-web`），示例组件在 `...minispring.samples.standalone`（模块 `samples/mini-spring-standalone`）。两套扫描范围互不相交，排错时不要混着判断。
 
 ## 5. Controller 地址访问不到
 
@@ -124,7 +124,7 @@ http://localhost:8080/
 
 ```text
 配置值还是默认值
-@MyValue 找不到 key
+@MiniValue 找不到 key
 No property found for key
 ```
 
@@ -134,7 +134,7 @@ No property found for key
 src/main/resources/application.properties
 ```
 
-如果使用 `@MyValue("app.name")`，就必须有：
+如果使用 `@MiniValue("app.name")`，就必须有：
 
 ```properties
 app.name=mini-spring
@@ -171,10 +171,10 @@ context.getBean(PayService.class)
 
 解决办法：
 
-使用 `@MyQualifier` 指定具体 Bean：
+使用 `@MiniQualifier` 指定具体 Bean：
 
 ```java
-public PayController(@MyQualifier("aliPayService") PayService payService) {
+public PayController(@MiniQualifier("aliPayService") PayService payService) {
     this.payService = payService;
 }
 ```
@@ -204,7 +204,7 @@ public B(A a) {
 在这个学习项目里，可以用 setter 注入演示更容易理解的循环依赖：
 
 ```java
-@MyAutowired
+@MiniAutowired
 public void setBetaService(BetaService betaService) {
     this.betaService = betaService;
 }
@@ -220,12 +220,12 @@ public void setBetaService(BetaService betaService) {
 方法执行了，但是没有出现 [AOP before] / [AOP after]
 ```
 
-这个项目的 AOP 是通过 `@MyLog` 标记方法，再由 `LogAopBeanPostProcessor` 创建代理。
+这个项目的 AOP 是通过 `@MiniLog` 标记方法，再由 `LogAopBeanPostProcessor` 创建代理。
 
 排查顺序：
 
-1. 方法上有没有 `@MyLog`。
-2. 当前 Bean 有没有被 `@MyComponent` 扫描到。
+1. 方法上有没有 `@MiniLog`。
+2. 当前 Bean 有没有被 `@MiniComponent` 扫描到。
 3. 调用的是不是容器里拿到的代理对象。
 4. 如果是构造器中较早注入的对象，可能拿到的是代理前的原始对象。
 
@@ -259,7 +259,7 @@ CGLIB 的原理是生成目标类的子类，所以 `final` 类不能被代理�
 常见现象：
 
 ```text
-Missing @MyRequestParam
+Missing @MiniRequestParam
 Missing required request parameter
 Unsupported target type
 ```
@@ -267,8 +267,8 @@ Unsupported target type
 这个项目里的简化 MVC 参数绑定支持：
 
 ```java
-@MyRequestParam("name") String name
-@MyRequestParam("count") int count
+@MiniRequestParam("name") String name
+@MiniRequestParam("count") int count
 ```
 
 访问时必须带上参数：
@@ -281,7 +281,7 @@ Unsupported target type
 
 解决办法：
 
-- 确认每个普通参数都写了 `@MyRequestParam`。
+- 确认每个普通参数都写了 `@MiniRequestParam`。
 - 确认 URL 上传入了对应参数。
 - 确认参数类型是当前转换器支持的类型：`String`、`int`、`long`、`boolean`、`double` 以及对应包装类。
 
@@ -359,7 +359,7 @@ Tests run: 12, Failures: 0, Errors: 0
 
 1. 先看最后一段异常，不被前面的大量日志干扰。
 2. 判断是 Maven、启动、请求、容器、AOP 还是测试问题。
-3. 找到项目里的对应文件，例如 `pom.xml`、`application.properties`、Controller、`MyApplicationContext`。
+3. 找到项目里的对应文件，例如 `pom.xml`、`application.properties`、Controller、`MiniApplicationContext`。
 4. 用一个最小测试或最小接口复现。
 5. 改完后跑测试确认，不只依赖主观判断。
 
