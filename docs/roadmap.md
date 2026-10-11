@@ -21,7 +21,7 @@
 - [x] `docs/adr/0001` ~ `0007`：七条决定架构走向的决策，状态均为 Accepted；
 - [x] `docs/adr/README.md`：ADR 流程与模板；
 - [x] `docs/roadmap.md`：本文件；
-- [x] `groupId` 定为 `io.github.kwrld3939`（GitHub 账号 kwrld3939，仓库 mini-spring-ioc-container）；
+- [x] `groupId` 定为 `io.github.kwrld3939`（GitHub 账号 kwrld3939，仓库已更名为 `mini-spring-framework`）；
 - [x] 库的父 POM 不继承 `spring-boot-starter-parent`（ADR-0004）。
 
 ## 阶段 1 · 架构重构（已完成，2026-10-11）

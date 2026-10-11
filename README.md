@@ -1,6 +1,6 @@
 # Mini Spring IoC Container
 
-[![CI](https://github.com/kwrld3939/mini-spring-ioc-container/actions/workflows/ci.yml/badge.svg)](https://github.com/kwrld3939/mini-spring-ioc-container/actions/workflows/ci.yml)
+[![CI](https://github.com/kwrld3939/mini-spring-framework/actions/workflows/ci.yml/badge.svg)](https://github.com/kwrld3939/mini-spring-framework/actions/workflows/ci.yml)
 
 更新日期：2026-10-11
 

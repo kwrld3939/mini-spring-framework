@@ -10,7 +10,7 @@
 
 	<name>mini-spring-parent</name>
 	<description>Mini Spring：手写的轻量 IoC / DI / AOP / MVC 框架（多模块聚合工程）</description>
-	<url>https://github.com/kwrld3939/mini-spring-ioc-container</url>
+	<url>https://github.com/kwrld3939/mini-spring-framework</url>
 
 	<licenses>
 		<license>
